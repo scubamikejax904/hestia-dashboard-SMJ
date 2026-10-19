@@ -6967,6 +6967,38 @@ html[data-dm="desktop"] button[data-mode="desktop"] {
   100% { border-color: var(--amber); }
 }
 
+/* Holiday iframe card — 1/3 width, full image height */
+.home-holiday-row {
+  display: flex !important;
+  gap: 14px;
+  flex: 0 0 auto;
+  width: 100%;
+}
+.home-holiday-card {
+  flex: 0 0 calc(33.333% - 10px) !important;
+  min-width: 0;
+  aspect-ratio: 16 / 9; /* Maintains proper image proportions */
+  max-height: 200px;
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: border-color 0.15s;
+  background: var(--bg-hover);
+}
+.home-holiday-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* Shows ENTIRE image, no cropping */
+  display: block;
+  pointer-events: none;
+}
+/* Hide on mobile */
+html[data-display-mobile] .home-holiday-row {
+  display: none !important;
+}
+
         </style>
         <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.18.0/ort.min.js" crossorigin="anonymous"></script>
@@ -7300,43 +7332,7 @@ html[data-dm="desktop"] button[data-mode="desktop"] {
                     verified release. Hash mismatch detected.</span
                 >
             </div>
-            <div class="app-update-banner" id="app-update-banner">
-                <span id="app-update-msg">A new version of Hestia is available</span
-                ><button
-                    onclick="dismissAppUpdateBanner()"
-                    style="
-                        background: none;
-                        border: none;
-                        cursor: pointer;
-                        color: var(--amber);
-                        font-size: 16px;
-                        line-height: 1;
-                        padding: 0 4px;
-                        opacity: 0.7;
-                    "
-                >
-                    ✕
-                </button>
-            </div>
-            <div class="app-update-banner" id="companion-update-banner">
-                <span id="companion-update-msg">The companion app on your hub is out of date</span
-                ><button
-                    onclick="dismissCompanionUpdateBanner()"
-                    style="
-                        background: none;
-                        border: none;
-                        cursor: pointer;
-                        color: var(--amber);
-                        font-size: 16px;
-                        line-height: 1;
-                        padding: 0 4px;
-                        opacity: 0.7;
-                        flex-shrink: 0;
-                    "
-                >
-                    ✕
-                </button>
-            </div>
+            
             <div class="app-update-banner" id="cfg-stale-banner">
                 <span id="cfg-stale-msg">Settings changed on another device</span
                 ><span style="display: flex; gap: 10px; align-items: center; flex-shrink: 0"
@@ -8890,6 +8886,7 @@ async function initPillSortable() {
                         parsed.config.cardOrder && (CONFIG.cardOrder = parsed.config.cardOrder),
                         parsed.config.googleCalUrl && (CONFIG.googleCalUrl = parsed.config.googleCalUrl),
                         parsed.config.weatherIframeUrl && (CONFIG.weatherIframeUrl = parsed.config.weatherIframeUrl),
+                        parsed.config.holidayIframeUrl !== undefined && (CONFIG.holidayIframeUrl = parsed.config.holidayIframeUrl),
                         parsed.config.homeOrder && (CONFIG.homeOrder = parsed.config.homeOrder),
                         parsed.config.homeStatsOrder && (CONFIG.homeStatsOrder = parsed.config.homeStatsOrder),
                         parsed.config.homePanesStacked !== undefined && (CONFIG.homePanesStacked = !!parsed.config.homePanesStacked),
@@ -9033,6 +9030,7 @@ async function initPillSortable() {
                         routines: CONFIG.routines || [],
                         googleCalUrl: CONFIG.googleCalUrl || "",
                         weatherIframeUrl: CONFIG.weatherIframeUrl || "",
+                        holidayIframeUrl: CONFIG.holidayIframeUrl || "",
                         homeOrder: CONFIG.homeOrder || [],
                         homeStatsOrder: CONFIG.homeStatsOrder || [],
                         homePanesStacked: !!CONFIG.homePanesStacked,
@@ -9973,117 +9971,7 @@ null !== bat && (S[id].bat = bat);
 }
                 return JSON.stringify(S[id]) !== prev;
             }
-            let lastFetchTime = null,
-                _appUpdateCheckTimer = null;
-            function checkAppVersion() {
-                fetch("https://api.github.com/repos/h4ven88/hestia-dashboard/releases/latest")
-                    .then((r) => (r.ok ? r.json() : null))
-                    .then((data) => {
-                        if (!data || !data.tag_name) return;
-                        const latest = data.tag_name.replace(/^v/, "");
-                        if ("2.2.0" === latest) return;
-                        const cur = "2.2.0".split(".").map(Number),
-                            rel = latest.split(".").map(Number);
-                        for (let i = 0; i < 3; i++) {
-                            if ((rel[i] || 0) > (cur[i] || 0)) {
-                                const banner = document.getElementById("app-update-banner"),
-                                    msg = document.getElementById("app-update-msg");
-                                if (banner && msg) {
-                                    try {
-                                        const snoozed = _LS.getItem("hestia-app-update-snooze");
-                                        if (snoozed && Date.now() < parseInt(snoozed)) return;
-                                    } catch (e) {}
-                                    (msg.textContent = isServedFromHub()
-                                        ? "Hestia v" +
-                                          latest +
-                                          " is available. Update the companion app (Hubitat Package Manager, or re-paste it under Apps Code), then open the app on your hub and click Done to refresh this dashboard."
-                                        : "Hestia v" + latest + " is available. Refresh the page to update."),
-                                        banner.classList.add("visible");
-                                }
-                                break;
-                            }
-                            if ((rel[i] || 0) < (cur[i] || 0)) break;
-                        }
-                    })
-                    .catch(() => {}),
-                    clearTimeout(_appUpdateCheckTimer),
-                    (_appUpdateCheckTimer = setTimeout(checkAppVersion, 216e5));
-            }
-            function dismissAppUpdateBanner() {
-                const banner = document.getElementById("app-update-banner");
-                banner && banner.classList.remove("visible");
-                try {
-                    _LS.setItem("hestia-app-update-snooze", Date.now() + 864e5);
-                } catch (e) {}
-            }
-            function _versionCmp(a, b) {
-                const norm = (v) => String(v).trim().replace(/^v/i, "").split(/[-+]/)[0].split(".").map(Number),
-                    A = norm(a),
-                    B = norm(b);
-                for (let i = 0; i < 3; i++) {
-                    if ((A[i] || 0) > (B[i] || 0)) return 1;
-                    if ((A[i] || 0) < (B[i] || 0)) return -1;
-                }
-                return 0;
-            }
-            let _companionCheckTimer = null,
-                _companionAppVersion = null,
-                _companionAppVersionFor = null;
-            async function checkCompanionVersion() {
-                if (
-                    (clearTimeout(_companionCheckTimer),
-                    (_companionCheckTimer = setTimeout(checkCompanionVersion, 6e4)),
-                    HUB_STORE || reconstructHubStore(),
-                    HUB_STORE)
-                )
-                    try {
-                        const out = await hubStoreFetch("version");
-                        if (!out.ok) return;
-                        const data = await out.res.json();
-                        if (!data || !data.appVersion) return;
-                        const _hubFiredBefore = reminderHubFires();
-                        (_companionAppVersion = String(data.appVersion)),
-                            (_companionAppVersionFor = String(HUB_STORE.appId)),
-                            clearTimeout(_companionCheckTimer),
-                            (_companionCheckTimer = setTimeout(checkCompanionVersion, 216e5)),
-                            reminderHubFires() !== _hubFiredBefore &&
-                                (console.log("[Reminders] hub capability changed — re-arming"), reminderInit());
-                        try {
-                            const snoozed = _LS.getItem("hestia-companion-update-snooze");
-                            if (snoozed && Date.now() < parseInt(snoozed)) return;
-                        } catch (e) {}
-                        const appBanner = document.getElementById("app-update-banner");
-                        if (appBanner && appBanner.classList.contains("visible")) return;
-                        const appCmp = _versionCmp(data.appVersion, "2.2.0"),
-                            dashCmp = data.dashboardVersion ? _versionCmp(data.dashboardVersion, "2.2.0") : 0;
-                        let text = null;
-                        if (
-                            (appCmp < 0
-                                ? (text = `The Hestia app on your hub is v${data.appVersion} and this dashboard is v2.2.0. Update it in Hubitat Package Manager (or re-paste HestiaDashboard.groovy under Apps Code), then open the app and click Done.`)
-                                : dashCmp < 0
-                                  ? (text = `The dashboard file on your hub is v${data.dashboardVersion} and this one is v2.2.0. Open the Hestia app on your hub and click Done to refresh it. Anything loading from the hub, like a wall panel, is still on the older copy.`)
-                                  : appCmp > 0 &&
-                                    (text = `This dashboard is v2.2.0 but your hub has v${data.appVersion}. Open the Hestia app on your hub and click Done to refresh the copy this device loads.`),
-                            !text)
-                        )
-                            return;
-                        const banner = document.getElementById("companion-update-banner"),
-                            msg = document.getElementById("companion-update-msg");
-                        if (!banner || !msg) return;
-                        (msg.textContent = text), banner.classList.add("visible");
-                    } catch (e) {}
-            }
-            function dismissCompanionUpdateBanner() {
-                const banner = document.getElementById("companion-update-banner");
-                banner && banner.classList.remove("visible");
-                try {
-                    _LS.setItem("hestia-companion-update-snooze", Date.now() + 864e5);
-                } catch (e) {}
-            }
-            let _lastUserActivity = Date.now(),
-                _cfgStaleCheckTimer = null;
-            const CFG_STALE_CHECK_MS = 3e4,
-                CFG_IDLE_REFRESH_MS = 3e4;
+            
             function _cfgTrackActivity() {
                 _lastUserActivity = Date.now();
             }
@@ -11075,6 +10963,11 @@ ma.innerHTML = `
         ${armedStatusCard("selectRoom('security')")}
         <div class="home-grid" id="home-grid-sortable">
             <div class="home-top-row" id="home-top-sortable">${_statsHTML}</div>
+            ${CONFIG.holidayIframeUrl ? `<div class="home-holiday-row">
+                <div class="home-holiday-card iframe-clickable" onclick="openIframeModal('${h(CONFIG.holidayIframeUrl)}')">
+                    <img src="${h(CONFIG.holidayIframeUrl)}" alt="Holiday" referrerpolicy="no-referrer">
+                </div>
+            </div>` : ''}
             <div class="home-iframes-row${panesStacked ? " stacked" : ""}" id="home-panels-sortable">${_panelsHTML}</div>
             ${_otherHTML}
         </div>`;
@@ -19680,6 +19573,15 @@ ${m.charAt(0).toUpperCase() + m.slice(1)}</button>`).join("")}
                         break;
                     case "integrations":
                         html = `<div class="sp-content-hdr"><span class="sp-content-icon">🔌</span>Integrations</div>
+
+
+<div class="sp-group">
+<div class="sp-group-lbl">Holiday Images</div>
+  <div class="sp-field"><label class="sp-label">Holiday Images Iframe URL</label>
+  <input class="sp-input" id="sp-holiday-iframe-url" value="${CONFIG.holidayIframeUrl || ""}" placeholder="https://...">
+  <span class="sp-hint">Displays in a dedicated row on desktop/tablet home screen. Leave blank to hide.</span></div>
+<div class="sp-sep"></div>
+
 <div class="sp-group">
 <div class="sp-group-lbl">Google Calendar</div>
 <div class="sp-field">
@@ -19979,6 +19881,9 @@ case "system":
                 
                 const weatherIframeEl = document.getElementById("sp-weather-iframe-url");
                 if (weatherIframeEl) CONFIG.weatherIframeUrl = weatherIframeEl.value.trim();
+
+                const holidayIframeEl = document.getElementById("sp-holiday-iframe-url");
+                if (holidayIframeEl) CONFIG.holidayIframeUrl = holidayIframeEl.value.trim();
 
                 const camRefreshEl = document.getElementById("sp-camera-refresh");
                 if (camRefreshEl) {
