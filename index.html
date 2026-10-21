@@ -6999,6 +6999,50 @@ html[data-dm="desktop"] button[data-mode="desktop"] {
 html[data-display-mobile] .home-holiday-row {
   display: none !important;
 }
+/* ── Conditional iframe cards (middle / right) ─────────────── */
+.iframe-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+}
+.iframe-card-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+.iframe-card-body {
+  flex: 1;
+  position: relative;
+  background: #000;
+}
+.iframe-card-body iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+.iframe-card-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--t4);
+  font-size: 12px;
+  font-style: italic;
+}
 
         </style>
         <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
@@ -8438,6 +8482,8 @@ const resolved = resolveDisplayMode();
                     roomOrder: [],
                     cardOrder: {},
                     weatherIframeUrl: "",
+                    iframeMiddleUrl: "",
+                    iframeRightUrl: "",
                     homeOrder: [],
                     homeStatsOrder: [],
                     homePanesStacked: false,
@@ -8888,6 +8934,8 @@ async function initPillSortable() {
                         parsed.config.googleCalUrl && (CONFIG.googleCalUrl = parsed.config.googleCalUrl),
                         parsed.config.weatherIframeUrl && (CONFIG.weatherIframeUrl = parsed.config.weatherIframeUrl),
                         parsed.config.holidayIframeUrl !== undefined && (CONFIG.holidayIframeUrl = parsed.config.holidayIframeUrl),
+                        parsed.config.iframeMiddleUrl !== undefined && (CONFIG.iframeMiddleUrl = parsed.config.iframeMiddleUrl),
+                        parsed.config.iframeRightUrl !== undefined && (CONFIG.iframeRightUrl = parsed.config.iframeRightUrl),
                         parsed.config.homeOrder && (CONFIG.homeOrder = parsed.config.homeOrder),
                         parsed.config.homeStatsOrder && (CONFIG.homeStatsOrder = parsed.config.homeStatsOrder),
                         parsed.config.homePanesStacked !== undefined && (CONFIG.homePanesStacked = !!parsed.config.homePanesStacked),
@@ -9032,6 +9080,8 @@ async function initPillSortable() {
                         googleCalUrl: CONFIG.googleCalUrl || "",
                         weatherIframeUrl: CONFIG.weatherIframeUrl || "",
                         holidayIframeUrl: CONFIG.holidayIframeUrl || "",
+                        iframeMiddleUrl: CONFIG.iframeMiddleUrl || "",
+                        iframeRightUrl: CONFIG.iframeRightUrl || "",
                         homeOrder: CONFIG.homeOrder || [],
                         homeStatsOrder: CONFIG.homeStatsOrder || [],
                         homePanesStacked: !!CONFIG.homePanesStacked,
@@ -10964,11 +11014,29 @@ ma.innerHTML = `
         ${armedStatusCard("selectRoom('security')")}
         <div class="home-grid" id="home-grid-sortable">
             <div class="home-top-row" id="home-top-sortable">${_statsHTML}</div>
-            ${CONFIG.holidayIframeUrl ? `<div class="home-holiday-row">
-                <div class="home-holiday-card iframe-clickable" onclick="openIframeModal('${h(CONFIG.holidayIframeUrl)}')">
-                    <img src="${h(CONFIG.holidayIframeUrl)}" alt="Holiday" referrerpolicy="no-referrer">
-                </div>
-            </div>` : ''}
+            ${(() => {
+  const holUrl = (CONFIG.holidayIframeUrl || "").trim();
+  const midUrl = (CONFIG.iframeMiddleUrl || "").trim();
+  const rightUrl = (CONFIG.iframeRightUrl || "").trim();
+  if (!holUrl && !midUrl && !rightUrl) return "";
+  
+  const holHtml = holUrl ? `
+    <div class="home-holiday-card iframe-clickable" onclick="openIframeModal('${h(holUrl)}')">
+      <img src="${h(holUrl)}" alt="Holiday" referrerpolicy="no-referrer">
+    </div>` : "";
+    
+  const midHtml = midUrl ? `
+    <div class="home-holiday-card iframe-clickable" onclick="openIframeModal('${h(midUrl)}')" style="background:#000;">
+      <iframe src="${h(midUrl)}" loading="lazy" scrolling="no" style="width:100%;height:100%;border:0;background:#000;display:block;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>
+    </div>` : "";
+    
+  const rightHtml = rightUrl ? `
+    <div class="home-holiday-card iframe-clickable" onclick="openIframeModal('${h(rightUrl)}')" style="background:#000;">
+      <iframe src="${h(rightUrl)}" loading="lazy" scrolling="no" style="width:100%;height:100%;border:0;background:#000;display:block;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>
+    </div>` : "";
+    
+  return `<div class="home-holiday-row">${holHtml}${midHtml}${rightHtml}</div>`;
+})()}
             <div class="home-iframes-row${panesStacked ? " stacked" : ""}" id="home-panels-sortable">${_panelsHTML}</div>
             ${_otherHTML}
         </div>`;
@@ -19571,22 +19639,34 @@ ${m.charAt(0).toUpperCase() + m.slice(1)}</button>`).join("")}
                         html = `<div class="sp-content-hdr"><span class="sp-content-icon">⚡</span>Routines</div>\n        <div class="sp-group">\n          <span class="sp-hint">Create routines with your voice — "Create a movie mode routine that dims the living room lights to 20%, closes the shades, and sets the fan to low." Or add one manually below.</span>\n        </div>\n        <div class="sp-sep"></div>\n        <div class="sp-group">\n          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">\n            <div class="sp-group-lbl" style="margin:0">Saved Routines</div>\n            <button class="sp-btn sp-btn-secondary" style="font-size:10px;padding:4px 10px" onclick="spRoutineShowForm()">+ New Routine</button>\n          </div>\n          <div id="sp-rtn-form-area"></div>\n          <div id="sp-rtn-list">${spRoutineListHtml()}</div>\n        </div>`;
                         break;
                     case "integrations":
-                        html = `<div class="sp-content-hdr"><span class="sp-content-icon">🔌</span>Integrations</div>
-
-
+html = `<div class="sp-content-hdr"><span class="sp-content-icon">🔌</span>Integrations</div>
 <div class="sp-group">
-<div class="sp-group-lbl">Holiday Images</div>
-  <div class="sp-field"><label class="sp-label">Holiday Images Iframe URL</label>
-  <input class="sp-input" id="sp-holiday-iframe-url" value="${CONFIG.holidayIframeUrl || ""}" placeholder="https://...">
-  <span class="sp-hint">Displays in a dedicated row on desktop/tablet home screen. Leave blank to hide.</span></div>
+<div class="sp-group-lbl">Holiday Image</div>
+<div class="sp-field"><label class="sp-label">Holiday Image URL</label>
+<input class="sp-input" id="sp-holiday-iframe-url" value="${h(CONFIG.holidayIframeUrl || "")}" placeholder="https://example.com/holiday.jpg">
+<span class="sp-hint">Displays in a dedicated row on desktop/tablet home screen. Leave blank to hide.</span></div>
+</div>
 <div class="sp-sep"></div>
-
+<div class="sp-group">
+<div class="sp-group-lbl">Middle Iframe</div>
+<div class="sp-field"><label class="sp-label">Middle Iframe URL</label>
+<input class="sp-input" id="cfg-iframe-middle-url" value="${h(CONFIG.iframeMiddleUrl || "")}" placeholder="https://example.com/widget">
+<span class="sp-hint">Shown next to the holiday image. Leave blank to hide. Click to expand fullscreen.</span></div>
+</div>
+<div class="sp-sep"></div>
+<div class="sp-group">
+<div class="sp-group-lbl">Right Iframe</div>
+<div class="sp-field"><label class="sp-label">Right Iframe URL</label>
+<input class="sp-input" id="cfg-iframe-right-url" value="${h(CONFIG.iframeRightUrl || "")}" placeholder="https://example.com/widget">
+<span class="sp-hint">Shown to the right of the middle iframe. Leave blank to hide. Click to expand fullscreen.</span></div>
+</div>
+<div class="sp-sep"></div>
 <div class="sp-group">
 <div class="sp-group-lbl">Google Calendar</div>
 <div class="sp-field">
 <label class="sp-label">Calendar Embed URL</label>
 <input class="sp-input" id="sp-gcal-url" value="${h(CONFIG.googleCalUrl || '')}" placeholder="https://calendar.google.com/calendar/embed?src=...">
-<span class="sp-hint">Paste the public embed URL from Google Calendar. Leave blank to use the built-in Hestia calendar. Click the card on the home screen to expand fullscreen.</span>
+<span class="sp-hint">Paste the public embed URL from Google Calendar. Leave blank to use the built-in Hestia calendar.</span>
 </div>
 </div>
 <div class="sp-sep"></div>
@@ -19595,21 +19675,20 @@ ${m.charAt(0).toUpperCase() + m.slice(1)}</button>`).join("")}
 <div class="sp-field">
 <label class="sp-label">Weather Iframe URL</label>
 <input class="sp-input" id="sp-weather-iframe-url" value="${h(CONFIG.weatherIframeUrl || '')}" placeholder="https://www.wunderground.com/dashboard/pws/...">
-<span class="sp-hint">Paste a public weather dashboard URL (Weather Underground, Windy, etc.). Leave blank to use the built-in Hestia weather card. Click the card on the home screen to expand fullscreen.</span>
+<span class="sp-hint">Paste a public weather dashboard URL. Leave blank to use the built-in Hestia weather card.</span>
 </div>
 </div>
 <div class="sp-sep"></div>
 <div class="sp-group">
-  <div class="sp-group-lbl">Home Layout</div>
-  <div class="sp-field">
-    <label class="sp-label">Weather &amp; Calendar Arrangement</label>
-    <select class="sp-input" id="sp-home-panes-layout">
-      <option value="side" ${!CONFIG.homePanesStacked ? "selected" : ""}>Side by side (vertical split)</option>
-      <option value="stack" ${CONFIG.homePanesStacked ? "selected" : ""}>Stacked (weather above calendar)</option>
-    </select>
-    </select>
-    <span class="sp-hint">Side by side splits the lower zone into two full-height panes. Stacked puts weather on top and calendar below. Only applies when both iframe URLs are set.</span>
-  </div>
+<div class="sp-group-lbl">Home Layout</div>
+<div class="sp-field">
+<label class="sp-label">Weather &amp; Calendar Arrangement</label>
+<select class="sp-input" id="sp-home-panes-layout">
+<option value="side" ${!CONFIG.homePanesStacked ? "selected" : ""}>Side by side (vertical split)</option>
+<option value="stack" ${CONFIG.homePanesStacked ? "selected" : ""}>Stacked (weather above calendar)</option>
+</select>
+<span class="sp-hint">Only applies when both iframe URLs are set.</span>
+</div>
 </div>`;
 break;
 case "system":
@@ -19883,6 +19962,12 @@ case "system":
 
                 const holidayIframeEl = document.getElementById("sp-holiday-iframe-url");
                 if (holidayIframeEl) CONFIG.holidayIframeUrl = holidayIframeEl.value.trim();
+
+// ── Middle & Right iframe cards ──────────────────────────────
+                const iframeMiddleEl = document.getElementById("cfg-iframe-middle-url");
+                if (iframeMiddleEl) CONFIG.iframeMiddleUrl = iframeMiddleEl.value.trim();
+                const iframeRightEl = document.getElementById("cfg-iframe-right-url");
+                if (iframeRightEl) CONFIG.iframeRightUrl = iframeRightEl.value.trim();
 
                 const camRefreshEl = document.getElementById("sp-camera-refresh");
                 if (camRefreshEl) {
